@@ -13,54 +13,7 @@ extern "C" {
 #include <math.h>
 }
 
-typedef std::chrono::high_resolution_clock Clock;
-typedef std::chrono::milliseconds Elapsed_ms;
-typedef std::chrono::duration<float> Elapsed;
-typedef std::chrono::time_point<Clock> Timestamp;
-
-class Watch {
-public:
-    Watch ()
-    {
-        start();
-    }
-
-    void
-    start ()
-    {
-        running = true;
-        reset();
-    }
-
-    void
-    reset ()
-    {
-        t1 = Clock::now();
-    }
-
-    void
-    stop ()
-    {
-        running = false;
-        t2 = Clock::now();
-    }
-
-    float
-    elapsed ()
-    {
-        Elapsed e;
-        if (running)
-            e = Clock::now() - t1;
-        else
-            e = t2 - t1;
-        return e.count();
-    }
-
-protected:
-    bool running;
-    Timestamp t1;
-    Timestamp t2;
-};
+#include "Watch.hpp"
 
 /*
  * Base class for entities. Eventually this will call the Lua scripts for a 
@@ -104,7 +57,13 @@ new_entity (lua_State *L)
     int id = lua_newref(L);
 
     lua_getglobal(L, "init");
+
+    /* while we have it on the stack, add its id to the table */
     lua_pushref(L, id);
+    lua_pushstring(L, "id");
+    lua_pushnumber(L, id);
+    lua_settable(L, -3);
+
     if (lua_pcall(L, 1, 0, 0))
         fault(L, "new_entity");
 
@@ -151,13 +110,16 @@ main (int argc, char **argv)
      * Create new entities. This will soon have a 'script' argument which will
      * run a lua script, initializing the entity inside the VM
      */
-    Entity E = new_entity(L);
+    std::vector<Entity> entities;
+    entities.push_back(new_entity(L));
+    entities.push_back(new_entity(L));
 
     while (1) {
         if (Frames.elapsed() < SIXTY_FPS)
             continue;
         Frames.reset();
-        update_entity(L, E);
+        for (auto &E : entities)
+            update_entity(L, E);
     }
 
     lua_close(L);
