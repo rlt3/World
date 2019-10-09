@@ -50,6 +50,66 @@ fault (lua_State *L, const char *where)
     exit(1);
 }
 
+/*
+ * Update the entity like entity[key] = value and then broadcast that change to
+ * all clients.
+ * arg1 = entity table
+ * arg2 = key in table
+ * arg3 = value in table
+ * returns nothing
+ */
+int
+broadcast (lua_State *L)
+{
+    static const int entity = 1;
+    static const int key = 2;
+    static const int value = 3;
+    const char *str;
+
+    /*
+     * Lua can more easily determine the proper type of its own objects to 
+     * print them out than C can. So we build the broadcast string within Lua
+     * itself. Once we have the built string then we can do what we want with
+     * it later.
+     */
+
+    /* get the id from the entity and leave it on the stack */
+    lua_pushstring(L, "id");
+    lua_gettable(L, entity);
+
+    /* push the values to concat them into our string */
+    lua_pushstring(L, ".");
+    lua_pushvalue(L, key);
+    lua_pushstring(L, "=");
+    lua_pushvalue(L, value);
+    lua_concat(L, 5);
+
+    /* string's lifetime is until it is popped */
+    str = lua_tostring(L, -1);
+    puts(str);
+    str = NULL;
+    lua_pop(L, 1);
+
+    /* 
+     * with the original arguments back in order, this can be called directly
+     * to set the entity's key value.
+     */
+    lua_settable(L, entity);
+
+    return 0;
+}
+
+/*
+ * Lookup an entity by id. Returns the entity if exists, otherwise nil
+ * arg1 = entity id
+ * returns entity table or nil
+ */
+int
+lookup_entity (lua_State *L)
+{
+    return 1;
+}
+
 Entity
 new_entity (lua_State *L)
 {
@@ -104,6 +164,8 @@ main (int argc, char **argv)
     if (!L)
         return 1;
     luaL_openlibs(L);
+    lua_pushcfunction(L, broadcast);
+    lua_setglobal(L, "broadcast");
     load_script(L, "script.lua");
 
     /*

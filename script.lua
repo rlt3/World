@@ -27,14 +27,6 @@ function init (E)
     next_path_point(E)
 end
 
---
--- Broadcast an entity state change that should be known by the client
---
-function broadcast (E, key, value)
-    E[key] = value
-    print(E.id .. "." .. key .. "=" .. value)
-end
-
 function update (E, dt)
     broadcast(E, "position", E.position + (E.direction * (E.move_per_second * dt)))
     if (E.position:near(E.path[E.path_point])) then
