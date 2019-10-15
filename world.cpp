@@ -11,9 +11,22 @@ extern "C" {
 #include <lualib.h>
 #include <unistd.h>
 #include <math.h>
+#include <string.h>
+
+#include <nanomsg/nn.h>
+#include <nanomsg/pubsub.h>
 }
 
 #include "Watch.hpp"
+
+void
+fatal (const char *func)
+{
+    fprintf(stderr, "%s: %s\n", func, nn_strerror(nn_errno()));
+    exit(1);
+}
+
+int SOCK;
 
 /*
  * Base class for entities. Eventually this will call the Lua scripts for a 
@@ -74,27 +87,38 @@ broadcast (lua_State *L)
      */
 
     /* get the id from the entity and leave it on the stack */
-    lua_pushstring(L, "id");
-    lua_gettable(L, entity);
+    //lua_pushstring(L, "id");
+    //lua_gettable(L, entity);
 
-    /* push the values to concat them into our string */
-    lua_pushstring(L, ".");
-    lua_pushvalue(L, key);
-    lua_pushstring(L, "=");
+    ///* push the values to concat them into our string */
+    //lua_pushstring(L, ".");
+    //lua_pushvalue(L, key);
+    //lua_pushstring(L, "=");
+    //lua_pushvalue(L, value);
+    //lua_concat(L, 5);
+    
+    lua_pushstring(L, "");
     lua_pushvalue(L, value);
-    lua_concat(L, 5);
+    lua_concat(L, 2);
 
     /* string's lifetime is until it is popped */
     str = lua_tostring(L, -1);
-    puts(str);
+
+    printf("Sending `%s`\n", str);
+    if (nn_send(SOCK, str, strlen(str) + 1, 0) < 0) {
+        fatal("nn_send");
+    }
+
     str = NULL;
     lua_pop(L, 1);
+
+    lua_pop(L, lua_gettop(L));
 
     /* 
      * with the original arguments back in order, this can be called directly
      * to set the entity's key value.
      */
-    lua_settable(L, entity);
+    //lua_settable(L, entity);
 
     return 0;
 }
@@ -160,6 +184,13 @@ main (int argc, char **argv)
     static const float SIXTY_FPS = 1.f/60.f;
     Watch Frames;
 
+    if ((SOCK = nn_socket(AF_SP, NN_PUB)) < 0) {
+        fatal("nn_socket");
+    }
+    if (nn_bind(SOCK, "tcp://*:8888") < 0) {
+        fatal("nn_bind");
+    }
+
     lua_State *L = luaL_newstate();
     if (!L)
         return 1;
@@ -174,7 +205,7 @@ main (int argc, char **argv)
      */
     std::vector<Entity> entities;
     entities.push_back(new_entity(L));
-    entities.push_back(new_entity(L));
+    //entities.push_back(new_entity(L));
 
     while (1) {
         if (Frames.elapsed() < SIXTY_FPS)

@@ -41,7 +41,8 @@ local Vec3_mt = {
     end,
 
     __tostring = function (self)
-        return "(" .. self.x .. ", " .. self.y .. ", " .. self.z .. ")"
+        --return "(" .. self.x .. ", " .. self.y .. ", " .. self.z .. ")"
+        return self.x .. "," .. self.y .. "," .. self.z
     end,
 
     __concat = function (lhs, rhs)
