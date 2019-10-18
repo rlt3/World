@@ -178,6 +178,29 @@ load_script (lua_State *L, const char *script)
         fault(L, "load_script");
 }
 
+static bool running = false;
+
+/*
+ * Create a subscriber for new connections. This binds to the same socket that
+ * the server is on.
+ */
+void*
+new_connection_thread (void *)
+{
+    void* buf = NULL;
+    int nbytes = 0;
+    int sub = nn_socket(AF_SP, NN_SUB);
+
+    nn_setsockopt(sub, NN_SUB, NN_SUB_SUBSCRIBE, "new", 3)
+    nn_connect("tcp://0.0.0.0:8888");
+
+    while (running) {
+        nbytes = nn_recv(sub, &buf, NN_MSG, 0);
+    }
+
+    return NULL;
+}
+
 int
 main (int argc, char **argv)
 {

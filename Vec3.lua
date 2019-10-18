@@ -1,11 +1,11 @@
 local Vec3_mt = {
     __index = {
         near = function (self, other)
-            if (math.abs(self.x - other.x) > 0.7) then
+            if (math.abs(self.x - other.x) > 0.1) then
                 return false
-            elseif (math.abs(self.y - other.y) > 0.7) then
+            elseif (math.abs(self.y - other.y) > 0.1) then
                 return false
-            elseif (math.abs(self.z - other.z) > 0.7) then
+            elseif (math.abs(self.z - other.z) > 0.1) then
                 return false
             else
                 return true
