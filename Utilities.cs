@@ -1,5 +1,6 @@
 using System;
 using System.Net;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -10,26 +11,57 @@ namespace Utilities
     public class Client
     {
         protected static String url = "tcp://0.0.0.0";
-        protected static String id = "Leroy";
         protected static bool running = true;
 
+        protected bool connected;
         protected RequestSocket interaction;
         protected SubscribeSocket world;
-
+        protected String id;
         protected String req_register;
         protected String req_access;
+        protected String req_end;
         protected String acknowledged;
         protected String denied;
 
+        protected bool skip;
+
+		public static string RandomString (int length)
+		{
+			const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            Random random = new Random();
+			return new string(Enumerable.Repeat(chars, length)
+			  .Select(s => s[random.Next(s.Length)]).ToArray());
+		}
+
+        public Client (String id)
+        {
+            Setup(id);
+            this.skip = true;
+        }
+
         public Client ()
         {
-            req_register = "REG " + id;
-            req_access = "ACCESS " + id;
-            acknowledged = id + "-ACK";
-            //denied = id + "-DENIED";
+            Setup(RandomString(10));
+        }
 
-            interaction = new RequestSocket();
-            world = new SubscribeSocket();
+        ~Client ()
+        {
+            if (connected)
+                Request(req_end);
+        }
+
+        public void Setup (String id)
+        {
+            this.id = id;
+            this.interaction = new RequestSocket();
+            this.world = new SubscribeSocket();
+            this.req_register = "REG " + id;
+            this.req_access = "ACCESS " + id;
+            this.req_end = "END " + id;
+            this.acknowledged = id + "-ACK";
+            this.denied = id + "-DENIED";
+            this.connected = false;
+            this.skip = false;
         }
 
         public void Request (String data)
@@ -56,13 +88,15 @@ namespace Utilities
              * Request our id from the server.
              */
             interaction.Connect(url + ":8889");
-            Request(req_register);
+            if (!skip)
+                Request(req_register);
 
             /* 
              * Connection must be made before requesting access or otherwise
              * we may miss some key events that have already been sent by the
              * time we connected.
              */
+            Console.WriteLine("Accessing...");
             world.Subscribe(id);
             world.Connect(url + ":8888");
 
@@ -70,31 +104,10 @@ namespace Utilities
              * Request access from the world server.
              */
             Request(req_access);
-        }
 
-    public static int Main (String[] args)
-    {
-        using (var s = new RequestSocket())
-        {
-            String register = "REG " + id;
-            s.Connect(url + ":8889");
-            s.Send(Encoding.UTF8.GetBytes(register));
-            String reply = Encoding.ASCII.GetString(s.Receive());
-            if (reply != id + "-ACK")
-                throw new Exception("Cannot auth: " + reply);
+            Console.WriteLine("Connected with id " + id);
+            this.connected = true;
         }
-
-        using (var s = new SubscribeSocket())
-        {
-            s.Subscribe(id);
-            s.Connect(url + ":8888");
-            while (running) {
-                Console.WriteLine(Encoding.ASCII.GetString(s.Receive()));
-            }
-        }
-
-        return 0;
-    }
     }
 
     // A simple container class that has a mutex around its payload

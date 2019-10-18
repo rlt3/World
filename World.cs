@@ -16,15 +16,18 @@ public class World
     protected Thread authThread;
     protected Thread worldThread;
 
-    protected Dictionary<String, int> clients;
-    protected Mutex clientsLock;
+    protected Dictionary<String, int> registered;
+
+    protected Dictionary<String, int> activeIds;
+    protected Mutex activeLock;
 
     public World ()
     {
         this.url = "tcp://0.0.0.0";
         this.running = true;
-        this.clients = new Dictionary<String, int>();
-        this.clientsLock = new Mutex(false);
+        this.registered = new Dictionary<String, int>();
+        this.activeIds = new Dictionary<String, int>();
+        this.activeLock = new Mutex(false);
     }
 
     /*
@@ -40,8 +43,8 @@ public class World
         {
             s.Bind(url + ":8888");
             while (running) {
-                clientsLock.WaitOne();
-                foreach (var entry in clients) {
+                activeLock.WaitOne();
+                foreach (var entry in activeIds) {
                     String data = entry.Key + " sync " + entry.Value;
                     s.Send(Encoding.UTF8.GetBytes(data));
                 }
@@ -50,9 +53,9 @@ public class World
                  * using this socket setup. Client's initial message should
                  * always be '0' here and not '4' or '5' or whatever.
                  */
-                foreach (var key in clients.Keys.ToList())
-                    clients[key] += 1;
-                clientsLock.ReleaseMutex();
+                foreach (var key in activeIds.Keys.ToList())
+                    activeIds[key] += 1;
+                activeLock.ReleaseMutex();
             }
         }
     }
@@ -85,15 +88,25 @@ public class World
 
                 if (e[0] == "REG") {
                     Console.WriteLine("Got registration request: " + request);
+                    registered[e[1]] = 0;
                     reply = e[1] + "-ACK";
                 }
                 else if (e[0] == "ACCESS") {
                     /*
-                     * TODO: Check that id has registered.
+                     * Check that id has registered.
                      */
-                    clientsLock.WaitOne();
-                    clients[e[1]] = 0;
-                    clientsLock.ReleaseMutex();
+                    if (registered.ContainsKey(e[1])) {
+                        activeLock.WaitOne();
+                        activeIds[e[1]] = 0;
+                        activeLock.ReleaseMutex();
+                        reply = e[1] + "-ACK";
+                    } else {
+                        reply = e[1] + "-DENIED";
+                    }
+                }
+                else if (e[0] == "END") {
+                    Console.WriteLine("Ending Connection: " + request);
+                    registered.Remove(e[1]);
                     reply = e[1] + "-ACK";
                 }
 
