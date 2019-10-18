@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -14,14 +15,15 @@ public class World
 
     protected Thread authThread;
     protected Thread worldThread;
-    protected List<String> clients;
+
+    protected Dictionary<String, int> clients;
     protected Mutex clientsLock;
 
     public World ()
     {
         this.url = "tcp://0.0.0.0";
         this.running = true;
-        this.clients = new List<String>();
+        this.clients = new Dictionary<String, int>();
         this.clientsLock = new Mutex(false);
     }
 
@@ -39,10 +41,17 @@ public class World
             s.Bind(url + ":8888");
             while (running) {
                 clientsLock.WaitOne();
-                foreach (var id in clients) {
-                    String data = id + " sync " + DateTime.Now.ToString("MM/dd/yyyy h:mm tt");
+                foreach (var entry in clients) {
+                    String data = entry.Key + " sync " + entry.Value;
                     s.Send(Encoding.UTF8.GetBytes(data));
                 }
+                /*
+                 * For testing out that we will get 'new connection' events
+                 * using this socket setup. Client's initial message should
+                 * always be '0' here and not '4' or '5' or whatever.
+                 */
+                foreach (var key in clients.Keys.ToList())
+                    clients[key] += 1;
                 clientsLock.ReleaseMutex();
             }
         }
@@ -71,12 +80,19 @@ public class World
                     continue;
 
                 String reply = "Bad Request.";
-                String[] e = Encoding.ASCII.GetString(bytes).Split(' ');
+                String request = Encoding.ASCII.GetString(bytes);
+                String[] e = request.Split(' ');
 
                 if (e[0] == "REG") {
-                    Console.WriteLine("Got registration request for " + e[1]);
+                    Console.WriteLine("Got registration request: " + request);
+                    reply = e[1] + "-ACK";
+                }
+                else if (e[0] == "ACCESS") {
+                    /*
+                     * TODO: Check that id has registered.
+                     */
                     clientsLock.WaitOne();
-                    clients.Add(String.Copy(e[1]));
+                    clients[e[1]] = 0;
                     clientsLock.ReleaseMutex();
                     reply = e[1] + "-ACK";
                 }

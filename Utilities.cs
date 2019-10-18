@@ -1,8 +1,102 @@
 using System;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Threading;
+using NNanomsg.Protocols;
 
 namespace Utilities 
 {
+    public class Client
+    {
+        protected static String url = "tcp://0.0.0.0";
+        protected static String id = "Leroy";
+        protected static bool running = true;
+
+        protected RequestSocket interaction;
+        protected SubscribeSocket world;
+
+        protected String req_register;
+        protected String req_access;
+        protected String acknowledged;
+        protected String denied;
+
+        public Client ()
+        {
+            req_register = "REG " + id;
+            req_access = "ACCESS " + id;
+            acknowledged = id + "-ACK";
+            //denied = id + "-DENIED";
+
+            interaction = new RequestSocket();
+            world = new SubscribeSocket();
+        }
+
+        public void Request (String data)
+        {
+            interaction.Send(Encoding.UTF8.GetBytes(data));
+            String reply = Response();
+            if (reply != acknowledged)
+                throw new Exception("Cannot register: " + reply);
+        }
+
+        public String Response ()
+        {
+            return Encoding.ASCII.GetString(interaction.Receive());
+        }
+
+        public String NextEvent ()
+        {
+            return Encoding.ASCII.GetString(world.Receive());
+        }
+
+        public void Connect ()
+        {
+            /*
+             * Request our id from the server.
+             */
+            interaction.Connect(url + ":8889");
+            Request(req_register);
+
+            /* 
+             * Connection must be made before requesting access or otherwise
+             * we may miss some key events that have already been sent by the
+             * time we connected.
+             */
+            world.Subscribe(id);
+            world.Connect(url + ":8888");
+
+            /*
+             * Request access from the world server.
+             */
+            Request(req_access);
+        }
+
+    public static int Main (String[] args)
+    {
+        using (var s = new RequestSocket())
+        {
+            String register = "REG " + id;
+            s.Connect(url + ":8889");
+            s.Send(Encoding.UTF8.GetBytes(register));
+            String reply = Encoding.ASCII.GetString(s.Receive());
+            if (reply != id + "-ACK")
+                throw new Exception("Cannot auth: " + reply);
+        }
+
+        using (var s = new SubscribeSocket())
+        {
+            s.Subscribe(id);
+            s.Connect(url + ":8888");
+            while (running) {
+                Console.WriteLine(Encoding.ASCII.GetString(s.Receive()));
+            }
+        }
+
+        return 0;
+    }
+    }
+
     // A simple container class that has a mutex around its payload
     public class SafeContainer
     {

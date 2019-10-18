@@ -5,7 +5,7 @@ world: utilities
 	mono-csc -r:Utilities.dll -lib:Utilities.dll -r:NNanomsg.dll -lib:NNanomsg.dll -main:Program World.cs
 
 player: utilities
-	mono-csc -r:Utilities.dll -lib:Utilities.dll -r:NNanomsg.dll -lib:NNanomsg.dll Player.cs
+	mono-csc -r:Utilities.dll -lib:Utilities.dll Player.cs
 
 utilities: Utilities.cs
-	mono-csc -target:library Utilities.cs
+	mono-csc -r:NNanomsg.dll -lib:NNanomsg.dll -target:library Utilities.cs
