@@ -4,15 +4,20 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Collections.Generic;
 using NNanomsg.Protocols;
+using System.Diagnostics;
+using Script;
+
+using EventHandler = System.Func<Script.Event, System.Collections.Generic.Dictionary<string, string>, bool>;
 
 namespace Utilities 
 {
     public class Client
     {
-        protected static String url = "tcp://0.0.0.0";
         protected static bool running = true;
 
+        protected String url;
         protected bool connected;
         protected RequestSocket interaction;
         protected SubscribeSocket world;
@@ -22,8 +27,7 @@ namespace Utilities
         protected String req_end;
         protected String acknowledged;
         protected String denied;
-
-        protected bool skip;
+        protected Thread listenThread;
 
 		public static string RandomString (int length)
 		{
@@ -33,21 +37,27 @@ namespace Utilities
 			  .Select(s => s[random.Next(s.Length)]).ToArray());
 		}
 
-        public Client (String id)
+        public Client (String url)
         {
-            Setup(id);
-            this.skip = true;
-        }
-
-        public Client ()
-        {
+            this.url = url;
             Setup(RandomString(10));
         }
 
         ~Client ()
         {
             if (connected)
-                Request(req_end);
+                Disconnect();
+        }
+
+        public void Disconnect ()
+        {
+            Request(req_end);
+            //world.Shutdown();
+            //interaction.Shutdown();
+            world.Dispose();
+            interaction.Dispose();
+            connected = false;
+            listenThread.Join();
         }
 
         public void Setup (String id)
@@ -61,10 +71,10 @@ namespace Utilities
             this.acknowledged = id + "-ACK";
             this.denied = id + "-DENIED";
             this.connected = false;
-            this.skip = false;
+            this.listenThread = null;
         }
 
-        public void Request (String data)
+        protected void Request (String data)
         {
             interaction.Send(Encoding.UTF8.GetBytes(data));
             String reply = Response();
@@ -72,41 +82,74 @@ namespace Utilities
                 throw new Exception("Cannot register: " + reply);
         }
 
-        public String Response ()
+        protected string Response ()
         {
             return Encoding.ASCII.GetString(interaction.Receive());
         }
 
-        public String NextEvent ()
+        protected string NextEvent ()
         {
             return Encoding.ASCII.GetString(world.Receive());
         }
 
         public void Connect ()
         {
-            /*
-             * Request our id from the server.
-             */
+            // Request our id from the server.
             interaction.Connect(url + ":8889");
-            if (!skip)
-                Request(req_register);
+            Request(req_register);
 
-            /* 
-             * Connection must be made before requesting access or otherwise
-             * we may miss some key events that have already been sent by the
-             * time we connected.
-             */
+            // Connection must be made before requesting access or otherwise
+            // we may miss some key events that have already been sent by the
+            // time we connected.
             Console.WriteLine("Accessing...");
             world.Subscribe(id);
             world.Connect(url + ":8888");
 
-            /*
-             * Request access from the world server.
-             */
+            // Request access from the world server.
             Request(req_access);
 
             Console.WriteLine("Connected with id " + id);
             this.connected = true;
+        }
+
+        // Start Listening in the background for events from the World server.
+        // Every unique event will be passed to the EventHandler to handle
+        // what to do on an event-by-event basis.
+        private void Listen (EventHandler handler)
+        {
+            if (!connected)
+                throw new Exception("Cannot listen to an unopen connection!");
+            this.listenThread = new Thread(() => Listen(handler));
+        }
+
+        private void ListenProc (EventHandler handler)
+        {
+            while (connected) {
+                string data = NextEvent();
+
+                string[] e = data.Split(" ");
+                Event event_type = Event.Default;
+                Dictionary<string,string> event_data = null;
+
+                if (e[0] == id && e[1] == "new") {
+                    //  This message has the format:
+                    //      <hash> new
+                    //         id <id>
+                    //         <key0> <value0>
+                    //         <key1> <value1>
+                    //         ...
+                    //  (Not including newlines -- formatted for readability)
+                    //  This is building that dictionary to pass to the script
+                    //  so it can update from the network.
+                    //
+                    Debug.Assert(e.Length >= 4);
+                    event_data = new Dictionary<string,string>();
+                    for (int i = 2; i < e.Length; i += 2)
+                        event_data[e[i]] = e[i+1];
+                }
+
+                handler(event_type, event_data);
+            }
         }
     }
 

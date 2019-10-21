@@ -1,11 +1,23 @@
-#g++ -Wall --std=c++11 `pkg-config --cflags luajit` -o world world.cpp `pkg-config --libs luajit` -lnanomsg -ldl -lm
-all: utilities world player
+all: world
 
-world: utilities
-	mono-csc -r:Utilities.dll -lib:Utilities.dll -r:NNanomsg.dll -lib:NNanomsg.dll -main:Program World.cs
+old:
+	g++ -Wall --std=c++11 `pkg-config --cflags luajit` -o world world.cpp `pkg-config --libs luajit` -lnanomsg -ldl -lm
+
+world: utilities script
+	mono-csc \
+		-r:Utilities.dll -lib:Utilities.dll \
+		-r:Script.dll -lib:Script.dll \
+		-r:NNanomsg.dll -lib:NNanomsg.dll \
+		-main:Program World.cs
 
 player: utilities
 	mono-csc -r:Utilities.dll -lib:Utilities.dll Player.cs
 
-utilities: Utilities.cs
-	mono-csc -r:NNanomsg.dll -lib:NNanomsg.dll -target:library Utilities.cs
+script: Script.cs
+	mono-csc -target:library Script.cs
+
+utilities: script Utilities.cs
+	mono-csc \
+		-r:Script.dll -lib:Script.dll \
+		-r:NNanomsg.dll -lib:NNanomsg.dll \
+		-target:library Utilities.cs
