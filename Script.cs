@@ -84,24 +84,30 @@ namespace Script {
         {
         }
 
-        public virtual void Update (Dictionary<string, string> props)
+        // Update from a dictionary of key=>value pairs of properties
+        public virtual void Update (Dictionary<string, string> properties)
         {
         }
 
+        // Returns a serialized list of properties 
+        public virtual string Properties ()
+        {
+            return "";
+        }
+
+        // Step the script for some delta-time
         public virtual void Step (float dt)
         {
         }
     }
 
-    /*
-     * The class that runs the virtual methods of the Scripts
-     *
-     * When a client connects, an initial series of messages are sent
-     * which fill out the NPCS and any other key information. These NPCS
-     * are sent with an id that corresponds to them inside the
-     * ScriptHandler list. That is, id = 0, is simply index 0 into the
-     * ScriptHandler's list.
-     */
+    // The class that runs the virtual methods of the Scripts
+    // 
+    // When a client connects, an initial series of messages are sent
+    // which fill out the NPCS and any other key information. These NPCS
+    // are sent with an id that corresponds to them inside the
+    // ScriptHandler list. That is, id = 0, is simply index 0 into the
+    // ScriptHandler's list.
     public static class ScriptHandler {
         static List<ScriptBase> list = new List<ScriptBase>();
         static Mutex list_lock = new Mutex(false);
@@ -120,6 +126,18 @@ namespace Script {
             list_lock.ReleaseMutex();
         }
 
+        // Get all properties of the current scripts registered
+        public static Dictionary<int, string> Properties ()
+        {
+            Dictionary<int, string> props = new Dictionary<int, string>();
+            list_lock.WaitOne();
+            for (int id = 0; id < list.Count; id++)
+                props[id] = "id " + id.ToString() + " " + list[id].Properties();
+            list_lock.ReleaseMutex();
+            return props;
+        }
+
+        // Step all of the scripts registered
         public static void Step (float dt)
         {
             list_lock.WaitOne();
@@ -162,23 +180,37 @@ namespace Script {
             this.direction = (path[path_point] - this.location).normalize();
         }
 
-        public override void Update (Dictionary<string, string> props)
-        {
-            foreach (var pair in props) {
-                if (pair.Key == "location")
-                    this.location = Vec3.FromString(pair.Value);
-                else if (pair.Key == "path_point")
-                    this.path_point = Int32.Parse(pair.Value);
-            }
-            next_path_point();
-        }
-
         public override void Step (float dt)
         {
             var dir = this.direction * (this.speed * dt);
             this.location = this.location + dir;
             if (this.location.near(path[path_point]))
                 next_path_point();
+        }
+
+        // This is the same dictionary that `Properties` produces but then
+        // immediately serializes. Use that serialized dictionary to update the
+        // state of another script. No Error check is done because the value of
+        // `properties` a rebuilding of the dictionary from the string returned
+        // by method `Proprties`
+        public override void Update (Dictionary<string, string> properties)
+        {
+            this.location = Vec3.FromString(properties["location"]);
+            this.path_point = Int32.Parse(properties["path_point"]);
+            next_path_point();
+        }
+
+        // Serialize the updateable properties of this Script to be transported
+        // over the network
+        public override string Properties ()
+        {
+            Dictionary<string, string> dict = new Dictionary<string, string>();
+            dict["location"] = this.location.ToString();
+            dict["path_point"] = this.path_point.ToString();
+            string properties = "";
+            foreach (var pair in dict)
+                properties += pair.Key + " " + pair.Value + " ";
+            return properties.TrimEnd(' ');;
         }
     }
 }

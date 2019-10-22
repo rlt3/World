@@ -21,7 +21,6 @@ public class World
 
     protected Dictionary<String, int> registered;
 
-    protected Dictionary<String, int> activeIds;
     protected Mutex activeLock;
 
     protected Channel eventChannel;
@@ -32,8 +31,8 @@ public class World
         this.running = true;
         this.eventChannel = new Channel();
         this.registered = new Dictionary<String, int>();
-        this.activeIds = new Dictionary<String, int>();
         this.activeLock = new Mutex(false);
+        ScriptHandler.Register(new MoveScript());
     }
 
     public void AddEvent (string evnt)
@@ -61,21 +60,9 @@ public class World
              */
             sock.Bind(url + ":8888");
             while (running) {
-                sock.Send(Encoding.UTF8.GetBytes(eventChannel.Receive()));
-
-//                activeLock.WaitOne();
-//                foreach (var entry in activeIds) {
-//                    String data = entry.Key + " sync " + entry.Value;
-//                    sock.Send(Encoding.UTF8.GetBytes(data));
-//                }
-//                /*
-//                 * For testing out that we will get 'new connection' events
-//                 * using this socket setup. Client's initial message should
-//                 * always be '0' here and not '4' or '5' or whatever.
-//                 */
-//                foreach (var key in activeIds.Keys.ToList())
-//                    activeIds[key] += 1;
-//                activeLock.ReleaseMutex();
+                string e = eventChannel.Receive();
+                Console.WriteLine("Sending: `" + e + "`");
+                sock.Send(Encoding.UTF8.GetBytes(e));
             }
         }
     }
@@ -121,16 +108,15 @@ public class World
                      *  as initial placements of current NPCs.
                      */
                     if (registered.ContainsKey(e[1])) {
-                        activeLock.WaitOne();
-                        activeIds[e[1]] = 0;
-                        activeLock.ReleaseMutex();
                         reply = e[1] + "-ACK";
                         /*
                          * Need a collection of Entities on the server side.
                          * Need generic entity on Client side which to
                          * instantiate when it receives this event.
                          */
-                        eventChannel.Insert(e[1] + " new");
+                        var props = ScriptHandler.Properties();
+                        foreach (var pair in props)
+                            eventChannel.Insert(e[1] + " new " + pair.Value);
                     } else {
                         reply = e[1] + "-DENIED";
                     }
@@ -170,28 +156,14 @@ public static class Program
 {
     public static int Main (String[] args)
     {
-        //World world = new World();
-        //world.Begin();
-        //Console.ReadLine();
-        //world.End();
+        World world = new World();
+        world.Begin();
 
-        //Vec3 a = new Vec3(2, 2, 2);
-        //Vec3 b = new Vec3(3, 3, 3);
-        //Vec3 c = a + b;
-        //Console.WriteLine("({0},{1},{2})", c.x, c.y, c.z);
-
-
-        //MoveScript a = new MoveScript(new Vec3(5,5,5), new Vec3(0,0,0), 5);
-        //MoveScript b = new MoveScript(new Vec3(9,9,9), new Vec3(0,0,0), 5);
-        //ScriptHandler.Register(a);
-        //ScriptHandler.Register(b);
-
-        MoveScript a = new MoveScript();
-        ScriptHandler.Register(a);
         while (true) {
             ScriptHandler.Step(1f/60f);
         }
 
+        world.End();
         return 0;
     }
 }

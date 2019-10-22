@@ -115,17 +115,20 @@ namespace Utilities
         // Start Listening in the background for events from the World server.
         // Every unique event will be passed to the EventHandler to handle
         // what to do on an event-by-event basis.
-        private void Listen (EventHandler handler)
+        public void Listen (EventHandler handler)
         {
             if (!connected)
                 throw new Exception("Cannot listen to an unopen connection!");
-            this.listenThread = new Thread(() => Listen(handler));
+            this.listenThread = new Thread(() => ListenProc(handler));
+            this.listenThread.Start();
         }
 
         private void ListenProc (EventHandler handler)
         {
             while (connected) {
                 string data = NextEvent();
+
+                Console.WriteLine("Received Event: " + data);
 
                 string[] e = data.Split(" ");
                 Event event_type = Event.Default;

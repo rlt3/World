@@ -1,19 +1,26 @@
 using System;
+using System.Collections.Generic;
 using Utilities;
+using Script;
 
+// 
+// A dummy class for immitating Player interactions with a server.
+//
 public class Player
 {
+    public static bool Handler (Event type, Dictionary<string, string> props)
+    {
+        MoveScript ms = new MoveScript(); 
+        ms.Update(props);
+        Console.WriteLine(ms.location.ToString());
+        return true;
+    }
+
     public static int Main (String[] args)
     {
-        Client client;
-        
-        if (args.Length > 0)
-            client = new Client(args[0]);
-        else
-            client = new Client();
-
+        Client client = new Client("tcp://45.55.192.66");
         client.Connect();
-        Console.WriteLine(client.NextEvent());
+        client.Listen(Handler);
         return 0;
     }
 }
