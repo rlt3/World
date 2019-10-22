@@ -24,4 +24,3 @@ public class Player
         return 0;
     }
 }
-

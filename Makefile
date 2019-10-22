@@ -8,19 +8,19 @@ world: utilities script
 		-r:Utilities.dll -lib:Utilities.dll \
 		-r:Script.dll -lib:Script.dll \
 		-r:NNanomsg.dll -lib:NNanomsg.dll \
-		-main:Program World.cs
+		-sdk:4 -main:Program World.cs
 
 player: utilities script
 	mono-csc \
 		-r:Utilities.dll -lib:Utilities.dll \
 		-r:Script.dll -lib:Script.dll \
-		Player.cs
+		-sdk:4 Player.cs
 
 script: Script.cs
-	mono-csc -target:library Script.cs
+	mono-csc -sdk:4 -target:library Script.cs
 
 utilities: script Utilities.cs
 	mono-csc \
 		-r:Script.dll -lib:Script.dll \
 		-r:NNanomsg.dll -lib:NNanomsg.dll \
-		-target:library Utilities.cs
+		-sdk:4 -target:library Utilities.cs

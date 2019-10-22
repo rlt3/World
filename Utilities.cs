@@ -52,12 +52,12 @@ namespace Utilities
         public void Disconnect ()
         {
             Request(req_end);
-            //world.Shutdown();
-            //interaction.Shutdown();
-            world.Dispose();
-            interaction.Dispose();
+            // Close the Listen thread first so sockets will be free
             connected = false;
             listenThread.Join();
+            // Then dispose of any sockets
+            world.Dispose();
+            interaction.Dispose();
         }
 
         public void Setup (String id)
@@ -130,7 +130,7 @@ namespace Utilities
 
                 Console.WriteLine("Received Event: " + data);
 
-                string[] e = data.Split(" ");
+                string[] e = data.Split(" ".ToCharArray());
                 Event event_type = Event.Default;
                 Dictionary<string,string> event_data = null;
 

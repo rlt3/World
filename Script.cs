@@ -38,7 +38,7 @@ namespace Script {
 
         public static Vec3 FromString (string data)
         {
-            string[] s = data.Split(",");
+            string[] s = data.Split(",".ToCharArray());
             float x = float.Parse(s[0]);
             float y = float.Parse(s[1]);
             float z = float.Parse(s[2]);
@@ -90,9 +90,9 @@ namespace Script {
         }
 
         // Returns a serialized list of properties 
-        public virtual string Properties ()
+        public virtual Dictionary<string, string> Properties ()
         {
-            return "";
+            return null;
         }
 
         // Step the script for some delta-time
@@ -126,13 +126,21 @@ namespace Script {
             list_lock.ReleaseMutex();
         }
 
+        public static string Serialize (Dictionary<string,string> props)
+        {
+            string properties = "";
+            foreach (var pair in props)
+                properties += pair.Key + " " + pair.Value + " ";
+            return properties.TrimEnd(' ');
+        }
+
         // Get all properties of the current scripts registered
         public static Dictionary<int, string> Properties ()
         {
             Dictionary<int, string> props = new Dictionary<int, string>();
             list_lock.WaitOne();
             for (int id = 0; id < list.Count; id++)
-                props[id] = "id " + id.ToString() + " " + list[id].Properties();
+                props[id] = "id " + id.ToString() + " " + Serialize(list[id].Properties());
             list_lock.ReleaseMutex();
             return props;
         }
@@ -202,15 +210,12 @@ namespace Script {
 
         // Serialize the updateable properties of this Script to be transported
         // over the network
-        public override string Properties ()
+        public override Dictionary<string, string> Properties ()
         {
-            Dictionary<string, string> dict = new Dictionary<string, string>();
-            dict["location"] = this.location.ToString();
-            dict["path_point"] = this.path_point.ToString();
-            string properties = "";
-            foreach (var pair in dict)
-                properties += pair.Key + " " + pair.Value + " ";
-            return properties.TrimEnd(' ');;
+            Dictionary<string, string> props = new Dictionary<string, string>();
+            props["location"] = this.location.ToString();
+            props["path_point"] = this.path_point.ToString();
+            return props;
         }
     }
 }
