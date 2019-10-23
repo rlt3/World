@@ -9,6 +9,7 @@ using NNanomsg.Protocols;
 using System.Diagnostics;
 using Script;
 
+//using EventHandler = System.Func<string, bool>;
 using EventHandler = System.Func<Script.Event, System.Collections.Generic.Dictionary<string, string>, bool>;
 
 namespace Utilities 
@@ -51,11 +52,15 @@ namespace Utilities
 
         public void Disconnect ()
         {
-            Request(req_end);
             // Close the Listen thread first so sockets will be free
             connected = false;
             listenThread.Join();
-            // Then dispose of any sockets
+
+            // Then request that the server remove and cleanup anything
+            // associated with this connection
+            Request(req_end);
+
+            // Finally dispose of any sockets
             world.Dispose();
             interaction.Dispose();
         }
@@ -87,12 +92,24 @@ namespace Utilities
             return Encoding.ASCII.GetString(interaction.Receive());
         }
 
+        // Block for input from the World server. Checks every 500ms and if 
+        // there is a message then this returns a string of that message.
+        // Otherwise, the only other value, null, is returned when the thread
+        // isn't connected anymore.
         protected string NextEvent ()
         {
-            return Encoding.ASCII.GetString(world.Receive());
+            byte[] bytes;
+            while (this.connected) {
+                //Thread.Sleep(500);
+                bytes = world.ReceiveImmediate();
+                if (bytes == null)
+                    continue;
+                return Encoding.ASCII.GetString(bytes);
+            }
+            return null;
         }
 
-        public void Connect ()
+        public void Connect (EventHandler handler)
         {
             // Request our id from the server.
             interaction.Connect(url + ":8889");
@@ -104,31 +121,25 @@ namespace Utilities
             Console.WriteLine("Accessing...");
             world.Subscribe(id);
             world.Connect(url + ":8888");
+            // `Connected` doesn't mean we are actually fully listening. Start
+            // the listen thread and then wait 500ms before requesting access
+            this.connected = true;
+            this.listenThread = new Thread(() => ListenProc(handler));
+            this.listenThread.Start();
+            Thread.Sleep(500);
 
             // Request access from the world server.
             Request(req_access);
-
             Console.WriteLine("Connected with id " + id);
-            this.connected = true;
-        }
-
-        // Start Listening in the background for events from the World server.
-        // Every unique event will be passed to the EventHandler to handle
-        // what to do on an event-by-event basis.
-        public void Listen (EventHandler handler)
-        {
-            if (!connected)
-                throw new Exception("Cannot listen to an unopen connection!");
-            this.listenThread = new Thread(() => ListenProc(handler));
-            this.listenThread.Start();
         }
 
         private void ListenProc (EventHandler handler)
         {
             while (connected) {
                 string data = NextEvent();
-
-                Console.WriteLine("Received Event: " + data);
+                // This basically means EOF
+                if (data == null)
+                    break;
 
                 string[] e = data.Split(" ".ToCharArray());
                 Event event_type = Event.Default;
@@ -144,7 +155,6 @@ namespace Utilities
                     //  (Not including newlines -- formatted for readability)
                     //  This is building that dictionary to pass to the script
                     //  so it can update from the network.
-                    //
                     Debug.Assert(e.Length >= 4);
                     event_data = new Dictionary<string,string>();
                     for (int i = 2; i < e.Length; i += 2)

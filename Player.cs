@@ -19,8 +19,8 @@ public class Player
     public static int Main (String[] args)
     {
         Client client = new Client("tcp://45.55.192.66");
-        client.Connect();
-        client.Listen(Handler);
+        client.Connect(Handler);
+        client.Disconnect();
         return 0;
     }
 }
