@@ -204,8 +204,8 @@ namespace Script {
         public override void Update (Dictionary<string, string> properties)
         {
             this.location = Vec3.FromString(properties["location"]);
+            this.direction = Vec3.FromString(properties["direction"]);
             this.path_point = Int32.Parse(properties["path_point"]);
-            next_path_point();
         }
 
         // Serialize the updateable properties of this Script to be transported
@@ -214,6 +214,7 @@ namespace Script {
         {
             Dictionary<string, string> props = new Dictionary<string, string>();
             props["location"] = this.location.ToString();
+            props["direction"] = this.direction.ToString();
             props["path_point"] = this.path_point.ToString();
             return props;
         }

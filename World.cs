@@ -160,7 +160,8 @@ public static class Program
         world.Begin();
 
         while (true) {
-            ScriptHandler.Step(1f/60f);
+            Thread.Sleep(1000 / 60);
+            ScriptHandler.Step(1f / 60f);
         }
 
         world.End();
